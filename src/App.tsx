@@ -1,36 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { AccessibilityProvider } from './context/AccessibilityContext';
 import { Header } from './components/Header';
 import { ThermalInversionAlert } from './components/ThermalInversionAlert';
 import { AqiDashboard } from './components/AqiDashboard';
-import { RoutinePlanner } from './components/RoutinePlanner';
-import { IndoorAirLab } from './components/IndoorAirLab';
-import { ImpactCalculator } from './components/ImpactCalculator';
-import { GenAiAssistant } from './components/GenAiAssistant';
-import { CommunitySmogWatch } from './components/CommunitySmogWatch';
 import { AirQualityData } from './types';
-import { ShieldCheck, HeartHandshake, CloudLightning, Info } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
+
+// Dynamic code-splitting for high-efficiency First Contentful Paint (FCP)
+const RoutinePlanner = lazy(() => import('./components/RoutinePlanner').then(m => ({ default: m.RoutinePlanner })));
+const IndoorAirLab = lazy(() => import('./components/IndoorAirLab').then(m => ({ default: m.IndoorAirLab })));
+const ImpactCalculator = lazy(() => import('./components/ImpactCalculator').then(m => ({ default: m.ImpactCalculator })));
+const GenAiAssistant = lazy(() => import('./components/GenAiAssistant').then(m => ({ default: m.GenAiAssistant })));
+const CommunitySmogWatch = lazy(() => import('./components/CommunitySmogWatch').then(m => ({ default: m.CommunitySmogWatch })));
+
+const ComponentSkeleton: React.FC = () => (
+  <div className="rounded-2xl p-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-pulse space-y-4">
+    <div className="h-6 w-1/3 bg-slate-200 dark:bg-slate-800 rounded"></div>
+    <div className="h-4 w-2/3 bg-slate-100 dark:bg-slate-800/60 rounded"></div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+      <div className="h-28 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+      <div className="h-28 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+      <div className="h-28 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+    </div>
+  </div>
+);
 
 export const AppContent: React.FC = () => {
   const [currentCity, setCurrentCity] = useState<string>('delhi');
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [aqiData, setAqiData] = useState<AirQualityData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchAqi = async (city: string) => {
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch(`/api/aqi?city=${encodeURIComponent(city)}`);
       const data = await res.json();
       if (data.status === 'success') {
         setAqiData(data.data);
-      } else {
-        setError(data.message || 'Failed to fetch air quality');
       }
     } catch (err) {
-      setError('Unable to load telemetry. Checking connection...');
+      console.error('Failed to load telemetry', err);
     } finally {
       setLoading(false);
     }
@@ -66,7 +76,7 @@ export const AppContent: React.FC = () => {
           />
         )}
 
-        {/* Dynamic Tab Views */}
+        {/* Dynamic Tab Views with Suspense */}
         {loading && !aqiData ? (
           <div className="py-24 flex flex-col items-center justify-center space-y-3">
             <div className="w-10 h-10 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin"></div>
@@ -75,7 +85,7 @@ export const AppContent: React.FC = () => {
             </p>
           </div>
         ) : (
-          <>
+          <Suspense fallback={<ComponentSkeleton />}>
             {activeTab === 'dashboard' && aqiData && (
               <AqiDashboard
                 data={aqiData}
@@ -105,7 +115,7 @@ export const AppContent: React.FC = () => {
             {activeTab === 'community' && (
               <CommunitySmogWatch />
             )}
-          </>
+          </Suspense>
         )}
       </main>
 
@@ -141,4 +151,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

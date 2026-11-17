@@ -1,4 +1,6 @@
 import { AirQualityData, HourlyAqiPoint, PollutantBreakdown, ThermalInversionStatus } from '../types/index.js';
+import { ATMOSPHERIC_CONSTANTS } from '../constants/atmospheric.js';
+import { MemoryTtlCache } from '../utils/cache.js';
 
 interface HotspotProfile {
   city: string;
@@ -149,7 +151,7 @@ const PRESET_HOTSPOTS: Record<string, HotspotProfile> = {
 };
 
 export const calculateUsAqiFromPm25 = (pm25: number): number => {
-  // EPA formula for PM2.5 to US AQI
+  // EPA formula breakpoints for PM2.5 to US AQI
   const breakpoints = [
     { cLow: 0.0, cHigh: 12.0, iLow: 0, iHigh: 50 },
     { cLow: 12.1, cHigh: 35.4, iLow: 51, iHigh: 100 },
@@ -181,10 +183,6 @@ export const getAqiCategory = (aqi: number): AirQualityData['category'] => {
 };
 
 export const generateHourlySmogCurve = (basePm25: number): HourlyAqiPoint[] => {
-  // Models classic winter inversion diurnal cycle:
-  // - Morning peak (07:00-09:30): Ground inversion + commute + cold starts (1.45x)
-  // - Afternoon drop (13:00-15:30): Solar heating breaks surface inversion, maximum convective mixing (0.65x)
-  // - Evening rebound (18:30-22:00): Nocturnal inversion reformation + heating + rush hour (1.35x)
   const multipliers = [
     1.15, 1.20, 1.25, 1.30, 1.38, 1.45, 1.50, 1.55, 1.40, 1.25, // 0-9h
     1.05, 0.90, 0.75, 0.65, 0.68, 0.78, 0.95, 1.15, 1.35, 1.42, // 10-19h
@@ -194,7 +192,8 @@ export const generateHourlySmogCurve = (basePm25: number): HourlyAqiPoint[] => {
   return multipliers.map((mul, hour) => {
     const pm = Math.max(5, Math.round(basePm25 * mul));
     const aqi = calculateUsAqiFromPm25(pm);
-    const inversionRisk = (hour >= 5 && hour <= 9) || (hour >= 18 && hour <= 23);
+    const inversionRisk = (hour >= ATMOSPHERIC_CONSTANTS.MORNING_INVERSION_PEAK_START_HOUR && hour <= ATMOSPHERIC_CONSTANTS.MORNING_INVERSION_PEAK_END_HOUR) || 
+                          (hour >= 18 && hour <= 23);
     const timeStr = `${hour.toString().padStart(2, '0')}:00`;
 
     return {
@@ -208,12 +207,21 @@ export const generateHourlySmogCurve = (basePm25: number): HourlyAqiPoint[] => {
 };
 
 export class AqiService {
+  private cache = new MemoryTtlCache<AirQualityData>(300_000, 100); // 5 min TTL, 100 entries
+
   public async getAirQuality(cityQuery = 'New Delhi'): Promise<AirQualityData> {
     const key = cityQuery.toLowerCase().trim().replace(/[\s_]+/g, '-');
     const matchedKey = Object.keys(PRESET_HOTSPOTS).find(k => key.includes(k) || k.includes(key)) || 'delhi';
-    const profile = PRESET_HOTSPOTS[matchedKey];
-
     const currentHour = new Date().getHours();
+    const cacheKey = `${matchedKey}:${currentHour}`;
+
+    // Fast-path: Check in-memory cache
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const profile = PRESET_HOTSPOTS[matchedKey];
     const hourly = generateHourlySmogCurve(profile.basePm25);
     const currentPoint = hourly[currentHour] || hourly[12];
 
@@ -237,7 +245,7 @@ export class AqiService {
       smogTrappingFactor: currentPoint.inversionRisk ? 2.8 : 1.2,
     };
 
-    return {
+    const result: AirQualityData = {
       city: profile.city,
       country: profile.country,
       coordinates: { lat: profile.lat, lng: profile.lng },
@@ -252,16 +260,19 @@ export class AqiService {
       timestamp: new Date().toISOString(),
       forecastHourly: hourly,
       safeVentilationWindow: {
-        startHour: 13,
-        endHour: 15,
-        note: 'Solar solar heating weakens surface inversion layer. PM2.5 is at daily low (approx. -40% vs morning). Short 10-15m filtered purge recommended.',
+        startHour: ATMOSPHERIC_CONSTANTS.SOLAR_CONVECTIVE_WINDOW_START_HOUR,
+        endHour: ATMOSPHERIC_CONSTANTS.SOLAR_CONVECTIVE_WINDOW_END_HOUR,
+        note: 'Solar heating weakens surface inversion layer. PM2.5 is at daily low (approx. -40% vs morning). Short 10-15m filtered purge recommended.',
       },
       worstExposureWindow: {
-        startHour: 6,
-        endHour: 10,
+        startHour: ATMOSPHERIC_CONSTANTS.MORNING_INVERSION_PEAK_START_HOUR,
+        endHour: ATMOSPHERIC_CONSTANTS.MORNING_INVERSION_PEAK_END_HOUR,
         note: 'Cold ground temperature inversion traps tailpipe NO2 and biomass particulates below 160m. Avoid outdoor jogging and seal doors.',
       },
     };
+
+    this.cache.set(cacheKey, result);
+    return result;
   }
 
   public getAvailableHotspots() {
@@ -271,6 +282,10 @@ export class AqiService {
       country: data.country,
       basePm25: data.basePm25,
     }));
+  }
+
+  public getCacheStats() {
+    return this.cache.getStats();
   }
 }
 

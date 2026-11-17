@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config.js';
@@ -17,6 +18,24 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const app = express();
+
+// High-Efficiency Gzip/Deflate Response Compression
+app.use(compression({
+  threshold: 1024, // Compress responses > 1 KB
+}));
+
+// Performance Timing Header
+app.use((_req, res, next) => {
+  const start = Date.now();
+  const originalSend = res.send;
+  res.send = function (body) {
+    if (!res.headersSent) {
+      res.setHeader('Server-Timing', `total;dur=${Date.now() - start}`);
+    }
+    return originalSend.call(this, body);
+  };
+  next();
+});
 
 // Security Headers
 app.use(configureSecurityHeaders());
@@ -38,7 +57,7 @@ app.use(inputSanitizationMiddleware);
 // Rate limiting on API routes
 app.use('/api', apiLimiter);
 
-// Health check endpoint
+// Health check endpoint with GCP telemetry
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'healthy',
@@ -51,6 +70,12 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// Cache control middleware for read-heavy static API routes
+app.use('/api/indoor-hacks', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'public, max-age=600, stale-while-revalidate=120');
+  next();
+});
+
 // Mount modular API routes
 app.use('/api/aqi', aqiRoutes);
 app.use('/api/routine', routineRoutes);
@@ -59,10 +84,16 @@ app.use('/api/impact', impactRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/community', communityRoutes);
 
-// Static file serving in production
+// Static file serving in production with aggressive immutable asset caching
 if (config.nodeEnv === 'production') {
   const clientDist = path.join(__dirname, '../../dist/client');
-  app.use(express.static(clientDist));
+  app.use('/assets', express.static(path.join(clientDist, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+  }));
+  app.use(express.static(clientDist, {
+    maxAge: '1h',
+  }));
   app.get('*', (_req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
@@ -77,4 +108,3 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`[SmogGuard AI] Server running on port ${config.port} in ${config.nodeEnv} mode`);
   });
 }
-

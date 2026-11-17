@@ -1,6 +1,13 @@
 import { CommunityReport } from '../types/index.js';
 
-let reports: CommunityReport[] = [
+export interface CommunityPledgeStats {
+  activePledges: number;
+  woodStovesPaused: number;
+  carpoolTripsUnified: number;
+  estimatedParticulatePreventedKg: number;
+}
+
+const INITIAL_REPORTS: CommunityReport[] = [
   {
     id: 'report-1',
     neighborhood: 'Oakwood North & 5th Ave',
@@ -39,38 +46,39 @@ let reports: CommunityReport[] = [
   },
 ];
 
-export interface CommunityPledgeStats {
-  activePledges: number;
-  woodStovesPaused: number;
-  carpoolTripsUnified: number;
-  estimatedParticulatePreventedKg: number;
-}
-
-let pledgeStats: CommunityPledgeStats = {
-  activePledges: 148,
-  woodStovesPaused: 34,
-  carpoolTripsUnified: 86,
-  estimatedParticulatePreventedKg: 19.4,
-};
-
 export class CommunityService {
+  private reportsMap = new Map<string, CommunityReport>();
+  private pledgeStats: CommunityPledgeStats = {
+    activePledges: 148,
+    woodStovesPaused: 34,
+    carpoolTripsUnified: 86,
+    estimatedParticulatePreventedKg: 19.4,
+  };
+
+  constructor() {
+    for (const report of INITIAL_REPORTS) {
+      this.reportsMap.set(report.id, report);
+    }
+  }
+
   public getReports(): CommunityReport[] {
-    return reports;
+    return Array.from(this.reportsMap.values()).reverse();
   }
 
   public addReport(report: Omit<CommunityReport, 'id' | 'reportedAt' | 'upvotes'>): CommunityReport {
+    const id = `report-${Date.now()}`;
     const newReport: CommunityReport = {
-      id: `report-${Date.now()}`,
+      id,
       ...report,
       reportedAt: 'Just now',
       upvotes: 1,
     };
-    reports.unshift(newReport);
+    this.reportsMap.set(id, newReport);
     return newReport;
   }
 
   public upvoteReport(id: string): CommunityReport | null {
-    const report = reports.find(r => r.id === id);
+    const report = this.reportsMap.get(id);
     if (report) {
       report.upvotes += 1;
       return report;
@@ -79,19 +87,19 @@ export class CommunityService {
   }
 
   public getPledgeStats(): CommunityPledgeStats {
-    return pledgeStats;
+    return this.pledgeStats;
   }
 
   public joinPledge(type: 'wood_moratorium' | 'carpool' | 'sanctuary_host'): CommunityPledgeStats {
-    pledgeStats.activePledges += 1;
+    this.pledgeStats.activePledges += 1;
     if (type === 'wood_moratorium') {
-      pledgeStats.woodStovesPaused += 1;
-      pledgeStats.estimatedParticulatePreventedKg += 0.8;
+      this.pledgeStats.woodStovesPaused += 1;
+      this.pledgeStats.estimatedParticulatePreventedKg += 0.8;
     } else if (type === 'carpool') {
-      pledgeStats.carpoolTripsUnified += 1;
-      pledgeStats.estimatedParticulatePreventedKg += 0.2;
+      this.pledgeStats.carpoolTripsUnified += 1;
+      this.pledgeStats.estimatedParticulatePreventedKg += 0.2;
     }
-    return pledgeStats;
+    return this.pledgeStats;
   }
 }
 

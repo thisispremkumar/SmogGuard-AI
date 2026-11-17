@@ -1,12 +1,13 @@
 import { ImpactCalculation } from '../types/index.js';
+import { ATMOSPHERIC_CONSTANTS } from '../constants/atmospheric.js';
 
 interface ImpactInputParams {
   carpoolDaysPerWeek: number;    // 0 - 5 days
   heatingTempDropDegC: number;   // 0 - 4 °C
   diyFilterActive: boolean;      // true / false
   transitShift: boolean;         // true / false
-  commuteDistanceKm?: number;    // default 15 km round trip
-  outdoorPm25?: number;          // default 140 µg/m³
+  commuteDistanceKm?: number;    // default 16 km round trip
+  outdoorPm25?: number;          // default 150 µg/m³
   familySize?: number;           // default 3
 }
 
@@ -25,25 +26,33 @@ export class ImpactCalculatorService {
       familySize = 3,
     } = params;
 
+    const {
+      HUMAN_DAILY_VENTILATION_VOLUME_M3,
+      BASELINE_INDOOR_PM25_INFILTRATION_FACTOR,
+      DIY_CORSI_ROSENTHAL_EFFICIENCY,
+      INDOOR_TIME_FRACTION_WINTER,
+      OUTDOOR_TIME_FRACTION_WINTER,
+      ICE_CAR_CO2_PER_KM_KG,
+      ICE_CAR_PM25_PER_KM_GRAMS,
+      HEATING_SAVINGS_FACTOR_PER_DEG_C,
+      AVERAGE_HOUSEHOLD_GAS_HEATING_WEEKLY_CO2_KG,
+      AVERAGE_HOUSEHOLD_GAS_HEATING_WEEKLY_NOX_GRAMS,
+      URBAN_TREE_DAILY_CO2_ABSORPTION_KG,
+    } = ATMOSPHERIC_CONSTANTS;
+
     // --- Personal Health Impact Model ---
-    // Average human ventilation rate: ~12 m³ of air inhaled per person per day (WHO benchmark)
-    const dailyBreathingVolumeM3 = 12;
-    
-    // Unmitigated baseline indoor air without filtration typically tracks 65-75% of outdoor PM2.5
-    const baselineIndoorPm25 = outdoorPm25 * 0.70;
-    
-    // DIY Corsi-Rosenthal / HEPA filtration reduces indoor concentration by ~80-90%
-    const filtrationEfficiency = diyFilterActive ? 0.85 : 0.0;
-    const effectiveIndoorPm25 = Math.max(10, Math.round(baselineIndoorPm25 * (1 - filtrationEfficiency)));
-    
-    // Average hours spent indoors during winter: ~20 hours/day
-    const indoorFraction = 20 / 24;
-    const outdoorFraction = 4 / 24;
+    const baselineIndoorPm25 = outdoorPm25 * BASELINE_INDOOR_PM25_INFILTRATION_FACTOR;
+    const filtrationEfficiency = diyFilterActive ? DIY_CORSI_ROSENTHAL_EFFICIENCY : 0.0;
+    const effectiveIndoorPm25 = Math.max(8, Math.round(baselineIndoorPm25 * (1 - filtrationEfficiency)));
 
     // Daily inhaled dose in micrograms (ug): Volume * Concentration
-    const baselineDailyDoseUg = dailyBreathingVolumeM3 * (indoorFraction * baselineIndoorPm25 + outdoorFraction * outdoorPm25);
-    const mitigatedDailyDoseUg = dailyBreathingVolumeM3 * (indoorFraction * effectiveIndoorPm25 + outdoorFraction * (transitShift ? outdoorPm25 * 0.7 : outdoorPm25));
+    const baselineDailyDoseUg = HUMAN_DAILY_VENTILATION_VOLUME_M3 * 
+      (INDOOR_TIME_FRACTION_WINTER * baselineIndoorPm25 + OUTDOOR_TIME_FRACTION_WINTER * outdoorPm25);
     
+    const mitigatedOutdoorPm = transitShift ? outdoorPm25 * 0.70 : outdoorPm25;
+    const mitigatedDailyDoseUg = HUMAN_DAILY_VENTILATION_VOLUME_M3 * 
+      (INDOOR_TIME_FRACTION_WINTER * effectiveIndoorPm25 + OUTDOOR_TIME_FRACTION_WINTER * mitigatedOutdoorPm);
+
     const doseReductionUg = Math.max(0, Math.round(baselineDailyDoseUg - mitigatedDailyDoseUg));
     const percentReduction = Math.min(95, Math.round((doseReductionUg / baselineDailyDoseUg) * 100));
 
@@ -57,30 +66,20 @@ export class ImpactCalculatorService {
     }
 
     // --- Community Emission Reduction Model ---
-    // Average passenger ICE car emits ~165g CO2/km and ~0.08g primary PM2.5/km (exhaust + brake/tire wear)
-    const carCo2PerKmKg = 0.165;
-    const carPm25PerKmGrams = 0.085;
-
-    // Carpool savings: 50% reduction for days carpooled
     const carpoolKmSavedWeekly = carpoolDaysPerWeek * commuteDistanceKm * 0.5;
-    // Transit shift: eliminates car trip entirely for 5 days
     const transitKmSavedWeekly = transitShift ? 5 * commuteDistanceKm : 0;
     const totalKmSavedWeekly = carpoolKmSavedWeekly + transitKmSavedWeekly;
 
-    const carCo2SavedWeeklyKg = totalKmSavedWeekly * carCo2PerKmKg;
-    const carPm25SavedWeeklyGrams = totalKmSavedWeekly * carPm25PerKmGrams;
+    const carCo2SavedWeeklyKg = totalKmSavedWeekly * ICE_CAR_CO2_PER_KM_KG;
+    const carPm25SavedWeeklyGrams = totalKmSavedWeekly * ICE_CAR_PM25_PER_KM_GRAMS;
 
-    // Heating savings: 1°C thermostat setpoint reduction saves ~7% energy consumption
-    // Typical natural gas household heating produces ~45kg CO2/week and emits NOx/particulates
-    const heatingSavingFactor = (heatingTempDropDegC * 0.07);
-    const heatingCo2SavedWeeklyKg = 45 * heatingSavingFactor;
-    const heatingPm25SavedWeeklyGrams = 8.5 * heatingSavingFactor; // avoided burner particulates/NOx precursors
+    const heatingSavingFactor = (heatingTempDropDegC * HEATING_SAVINGS_FACTOR_PER_DEG_C);
+    const heatingCo2SavedWeeklyKg = AVERAGE_HOUSEHOLD_GAS_HEATING_WEEKLY_CO2_KG * heatingSavingFactor;
+    const heatingPm25SavedWeeklyGrams = AVERAGE_HOUSEHOLD_GAS_HEATING_WEEKLY_NOX_GRAMS * heatingSavingFactor;
 
     const totalCo2SavedWeeklyKg = Math.round((carCo2SavedWeeklyKg + heatingCo2SavedWeeklyKg) * 10) / 10;
     const totalPm25SavedWeeklyGrams = Math.round((carPm25SavedWeeklyGrams + heatingPm25SavedWeeklyGrams) * 10) / 10;
-    
-    // Mature urban tree absorbs approx. 22kg CO2 per year (~0.06 kg/day = 1 tree-day)
-    const treeDaysEquivalent = Math.round(totalCo2SavedWeeklyKg / 0.06);
+    const treeDaysEquivalent = Math.round(totalCo2SavedWeeklyKg / URBAN_TREE_DAILY_CO2_ABSORPTION_KG);
 
     const narrative = `By running ${diyFilterActive ? 'a DIY Corsi-Rosenthal filter indoors' : 'ambient routines'}, ` +
       `lowering your thermostat by ${heatingTempDropDegC}°C, and ${carpoolDaysPerWeek > 0 ? `carpooling ${carpoolDaysPerWeek} days/wk` : 'optimizing travel'}, ` +

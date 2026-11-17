@@ -15,6 +15,16 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist/client',
+    target: 'es2022',
+    minify: 'esbuild',
+    cssMinify: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-icons': ['lucide-react'],
+        },
+      },
+    },
   },
 });
-
