@@ -73,8 +73,8 @@ app.use(errorHandler);
 
 // Start server if not running in test mode
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(config.port, () => {
-    console.log(`[SmogGuard AI] Server running on http://localhost:${config.port} in ${config.nodeEnv} mode`);
+  app.listen(config.port, '0.0.0.0', () => {
+    console.log(`[SmogGuard AI] Server running on port ${config.port} in ${config.nodeEnv} mode`);
   });
 }
 
