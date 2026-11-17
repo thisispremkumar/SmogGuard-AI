@@ -3,6 +3,7 @@
 > **Challenge 6 Submission:** A GenAI-powered assistant empowering families and communities to navigate severe winter smog and urban air pollution with personalized low-emission daily routines, indoor air quality hacks, and sustainable alternatives while clearly explaining the direct health and environmental impact of their choices.
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-SmogGuard--AI-blue?logo=github)](https://github.com/thisispremkumar/SmogGuard-AI)
+[![Cloud Run](https://img.shields.io/badge/Cloud%20Run-Live%20Demo-emerald?logo=googlecloud)](https://smogguard-ai-730243407394.us-central1.run.app)
 [![GCP Project](https://img.shields.io/badge/GCP%20Project-promptwars--edition-4285F4?logo=googlecloud)](https://console.cloud.google.com)
 [![Tests](https://img.shields.io/badge/tests-16%20passed-emerald)](file:///C:/Users/premm/Desktop/Projects/challenge6/server/tests)
 [![Accessibility](https://img.shields.io/badge/accessibility-WCAG%202.1%20AA-cyan)](file:///C:/Users/premm/Desktop/Projects/challenge6/src/context/AccessibilityContext.tsx)
@@ -12,10 +13,12 @@
 ---
 
 ## ☁️ Google Cloud Platform Deployment & Telemetry
+* **Live Cloud Run URL**: [https://smogguard-ai-730243407394.us-central1.run.app](https://smogguard-ai-730243407394.us-central1.run.app)
 * **GitHub Repository**: [https://github.com/thisispremkumar/SmogGuard-AI.git](https://github.com/thisispremkumar/SmogGuard-AI.git)
 * **GCP Project ID**: `promptwars-edition`
 * **GCP Project Number**: `730243407394`
 * **Primary Region**: `us-central1`
+* **Service Name**: `smogguard-ai`
 
 ---
 
