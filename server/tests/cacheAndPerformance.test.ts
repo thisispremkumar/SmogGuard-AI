@@ -62,3 +62,4 @@ describe('High-Efficiency Caching & Performance Engine', () => {
     expect(stats.hits).toBeGreaterThan(0);
   });
 });
+

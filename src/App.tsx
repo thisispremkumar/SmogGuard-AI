@@ -4,9 +4,10 @@ import { Header } from './components/Header';
 import { ThermalInversionAlert } from './components/ThermalInversionAlert';
 import { AqiDashboard } from './components/AqiDashboard';
 import { AirQualityData } from './types';
+import { apiClient } from './services/apiClient';
 import { ShieldCheck } from 'lucide-react';
 
-// Dynamic code-splitting for high-efficiency First Contentful Paint (FCP)
+// Dynamic route code-splitting for optimal First Contentful Paint (FCP)
 const RoutinePlanner = lazy(() => import('./components/RoutinePlanner').then(m => ({ default: m.RoutinePlanner })));
 const IndoorAirLab = lazy(() => import('./components/IndoorAirLab').then(m => ({ default: m.IndoorAirLab })));
 const ImpactCalculator = lazy(() => import('./components/ImpactCalculator').then(m => ({ default: m.ImpactCalculator })));
@@ -34,11 +35,8 @@ export const AppContent: React.FC = () => {
   const fetchAqi = async (city: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/aqi?city=${encodeURIComponent(city)}`);
-      const data = await res.json();
-      if (data.status === 'success') {
-        setAqiData(data.data);
-      }
+      const data = await apiClient.getAirQuality(city);
+      setAqiData(data);
     } catch (err) {
       console.error('Failed to load telemetry', err);
     } finally {

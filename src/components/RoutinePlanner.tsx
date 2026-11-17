@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Users, ShieldAlert, Sparkles, Check, AlertCircle, Clock, Thermometer, Wind, RefreshCw } from 'lucide-react';
 import { DailyRoutinePlan, FamilyProfile, VulnerableCondition, CommuteMode, HeatingType, CookingFuel } from '../types';
+import { apiClient } from '../services/apiClient';
 
 interface RoutinePlannerProps {
   currentCity: string;
@@ -27,22 +28,10 @@ export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({ currentCity }) =
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/routine/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...profile,
-          locationName: currentCity,
-        }),
-      });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setPlan(data.data);
-      } else {
-        setError(data.message || 'Failed to generate routine');
-      }
+      const data = await apiClient.generateRoutine(profile, currentCity);
+      setPlan(data);
     } catch (err) {
-      setError('Network error while connecting to SmogGuard Routine Engine.');
+      setError(err instanceof Error ? err.message : 'Network error while connecting to Routine Engine.');
     } finally {
       setLoading(false);
     }

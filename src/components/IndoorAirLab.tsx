@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wrench, Shield, CheckCircle2, ChevronRight, Sparkles, DollarSign, Gauge, Cpu, Box, HelpCircle } from 'lucide-react';
 import { IndoorAirHack } from '../types';
+import { apiClient } from '../services/apiClient';
 
 export const IndoorAirLab: React.FC = () => {
   const [hacks, setHacks] = useState<IndoorAirHack[]>([]);
@@ -9,13 +10,10 @@ export const IndoorAirLab: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    fetch('/api/indoor-hacks')
-      .then(res => res.json())
+    apiClient.getIndoorHacks()
       .then(data => {
-        if (data.status === 'success') {
-          setHacks(data.data);
-          setSelectedHack(data.data[0]); // default to Corsi-Rosenthal Box
-        }
+        setHacks(data);
+        if (data.length > 0) setSelectedHack(data[0]);
       })
       .catch(console.error)
       .finally(() => setLoading(false));

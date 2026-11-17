@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, AlertTriangle, ThumbsUp, PlusCircle, ShieldCheck, Flame, Car, Building2, Sparkles } from 'lucide-react';
 import { CommunityReport } from '../types';
+import { apiClient } from '../services/apiClient';
 
 interface PledgeStats {
   activePledges: number;
@@ -27,12 +28,9 @@ export const CommunitySmogWatch: React.FC = () => {
 
   const fetchReports = async () => {
     try {
-      const res = await fetch('/api/community/reports');
-      const data = await res.json();
-      if (data.status === 'success') {
-        setReports(data.data.reports);
-        setStats(data.data.stats);
-      }
+      const data = await apiClient.getCommunityData();
+      setReports(data.reports);
+      setStats(data.stats);
     } catch (err) {
       console.error('Failed to load community reports', err);
     }
@@ -44,11 +42,8 @@ export const CommunitySmogWatch: React.FC = () => {
 
   const handleUpvote = async (id: string) => {
     try {
-      const res = await fetch(`/api/community/reports/${id}/upvote`, { method: 'POST' });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setReports(prev => prev.map(r => (r.id === id ? data.data : r)));
-      }
+      const updated = await apiClient.upvoteCommunityReport(id);
+      setReports(prev => prev.map(r => (r.id === id ? updated : r)));
     } catch (err) {
       console.error('Failed to upvote', err);
     }
@@ -59,23 +54,16 @@ export const CommunitySmogWatch: React.FC = () => {
     if (!newNeighborhood.trim() || !newDetails.trim()) return;
 
     try {
-      const res = await fetch('/api/community/reports', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          neighborhood: newNeighborhood,
-          type: newType,
-          details: newDetails,
-          severity: newSeverity,
-        }),
+      const newReport = await apiClient.addCommunityReport({
+        neighborhood: newNeighborhood,
+        type: newType,
+        details: newDetails,
+        severity: newSeverity,
       });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setReports(prev => [data.data, ...prev]);
-        setShowReportModal(false);
-        setNewNeighborhood('');
-        setNewDetails('');
-      }
+      setReports(prev => [newReport, ...prev]);
+      setShowReportModal(false);
+      setNewNeighborhood('');
+      setNewDetails('');
     } catch (err) {
       console.error('Failed to create report', err);
     }
@@ -83,16 +71,9 @@ export const CommunitySmogWatch: React.FC = () => {
 
   const handlePledge = async (type: 'wood_moratorium' | 'carpool' | 'sanctuary_host') => {
     try {
-      const res = await fetch('/api/community/pledge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type }),
-      });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setStats(data.data);
-        setHasPledged(true);
-      }
+      const updatedStats = await apiClient.joinCommunityPledge(type);
+      setStats(updatedStats);
+      setHasPledged(true);
     } catch (err) {
       console.error('Failed to pledge', err);
     }

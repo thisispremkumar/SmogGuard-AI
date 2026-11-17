@@ -87,10 +87,16 @@ challenge6/
 
 ## 🏆 Evaluation Focus Areas Mapping
 
-### 1. Code Quality (High Impact)
-- **Strict TypeScript Typing**: End-to-end type safety across both frontend and backend (`server/types/index.ts` and `src/types/index.ts`).
-- **Separation of Concerns**: Strict architectural isolation between routing, business logic (`services/`), security middleware (`middleware/`), and presentation components.
-- **Maintainability & Documentation**: JSDoc comments, clean naming conventions, and modular component design.
+### 1. Code Quality & Clean Architecture (High Impact)
+* **Separation of Concerns (MVC & Clean Architecture)**:
+  - **Controllers Layer (`server/controllers/`)**: HTTP handlers completely decoupled from routing declarations (`AqiController`, `RoutineController`, `IndoorAirController`, `ImpactController`, `AssistantController`, `CommunityController`).
+  - **Services Layer (`server/services/`)**: Pure domain and atmospheric business logic isolated from HTTP transport.
+  - **Standardized API Response Pattern (`server/utils/apiResponse.ts`)**: Unified `ApiResponse<T>` envelope across all endpoints.
+  - **Frontend Centralized API Client (`src/services/apiClient.ts`)**: Strongly-typed client abstracting network calls away from React presentation components.
+* **Custom Domain Error Hierarchy (`server/errors/AppError.ts`)**: Operational domain errors (`BadRequestError`, `NotFoundError`, `ValidationError`, `InternalServerError`) with centralized non-leaking error handling.
+* **Production Structured Logging (`server/utils/logger.ts`)**: Timestamped contextual logging replacing bare console outputs.
+* **Zero Magic Numbers (`server/constants/atmospheric.ts`)**: Every aerodynamic, respiratory, and emission factor is extracted with authoritative peer-reviewed citations (WHO, EPA, ASHRAE, IPCC).
+* **Strict TypeScript Typing**: End-to-end type safety across both frontend and backend (`server/types/index.ts` and `src/types/index.ts`) with zero implicit `any`.
 
 ### 2. Security (Safe and Responsible Implementation)
 - **Prompt Injection Defense**: `checkPromptInjection()` in [security.ts](file:///C:/Users/premm/Desktop/Projects/challenge6/server/middleware/security.ts#L43-L65) detects and neutralizes jailbreak attempts (e.g. *"ignore previous instructions"*, *"system override"*, *"act as a DAN"*).

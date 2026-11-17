@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, AlertCircle, ArrowRight, CornerDownLeft, ShieldCheck } from 'lucide-react';
 import { ChatMessage } from '../types';
+import { apiClient } from '../services/apiClient';
 
 interface GenAiAssistantProps {
   currentCity: string;
@@ -57,33 +58,24 @@ How can I assist your family today?`,
     setIsSubmitting(true);
 
     try {
-      const res = await fetch('/api/assistant/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: query,
-          location: currentCity,
-          familyContext: 'Family with children and vulnerable members navigating urban winter smog',
-        }),
-      });
+      const data = await apiClient.askAssistant(
+        query,
+        currentCity,
+        'Family with children and vulnerable members navigating urban winter smog'
+      );
 
-      const data = await res.json();
-      if (data.status === 'success') {
-        const assistantMsg: ChatMessage = {
-          id: `assistant-${Date.now()}`,
-          sender: 'assistant',
-          text: data.data.answer,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          metadata: {
-            groundedData: data.data.groundedFacts,
-            actionPills: data.data.actionPills,
-            safetyNotice: data.data.safetyNotice,
-          },
-        };
-        setMessages(prev => [...prev, assistantMsg]);
-      } else {
-        throw new Error(data.message || 'Error from assistant');
-      }
+      const assistantMsg: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        sender: 'assistant',
+        text: data.answer,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        metadata: {
+          groundedData: data.groundedFacts,
+          actionPills: data.actionPills,
+          safetyNotice: data.safetyNotice,
+        },
+      };
+      setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
       const errorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
